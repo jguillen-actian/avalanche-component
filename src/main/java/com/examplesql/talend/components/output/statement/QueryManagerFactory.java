@@ -11,17 +11,17 @@ public final class QueryManagerFactory {
 
     public static QueryManagerImpl getQueryManager(final I18nMessage i18n,
                                                    final OutputConfiguration configuration) {
-        switch (configuration.isActionOnData()) {
-            case INSERT:
-                return new Insert(configuration, i18n);
-            case UPDATE:
-                return new Update(configuration, i18n);
-            case DELETE:
-                return new Delete(configuration, i18n);
-            case UPSERT:
-                return new UpsertDefault(configuration, i18n);
-            case BULK_LOAD:
-                return new BulkLoad(configuration, i18n);
+        switch (configuration.isActionOnTable()) {
+            case NONE:
+                return new None(configuration, i18n);
+            case CREATE:
+                return new Create(configuration, i18n);
+            case DROP_AND_CREATE: ;
+                return new DropAndCreate(configuration, i18n);
+            case CREATE_TABLE_IF_NOT_EXISTS:
+                return new CreateTableIfNotExists(configuration, i18n);
+            case DROP_TABLE_IF_EXISTS_AND_CREATE:
+                return new DropTableIfExistsAndCreate(configuration, i18n);
             default:
                 throw new IllegalStateException(i18n.errorUnsupportedDatabaseAction());
         }

@@ -65,15 +65,21 @@ public interface I18nMessage {
         String errorUnsupportedType(String type, String field);
 
         //
-        String actionOnDataInsert();
+//        String actionOnDataInsert();
+//
+//        String actionOnDataUpdate();
+//
+//        String actionOnDataUpsert();
+//
+//        String actionOnDataDelete();
+//
+//        String actionOnDataBulkLoad();
 
-        String actionOnDataUpdate();
-
-        String actionOnDataUpsert();
-
-        String actionOnDataDelete();
-
-        String actionOnDataBulkLoad();
+        String actionOnTableNone();
+        String actionOnTableCreate();
+        String actionOnTableDropAndCreate();
+        String actionOnTableCreateTableIfNotExists();
+        String actionOnTableDropTableIfExistsAndCreate();
 
         String errorSingleSortKeyInvalid();
 

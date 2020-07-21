@@ -1,7 +1,7 @@
 package com.examplesql.talend.components.output.statement;
 
 import com.examplesql.talend.components.output.Reject;
-import com.examplesql.talend.components.service.ExampleSQLComponentService;
+import com.examplesql.talend.components.service.AvalancheComponentBulkService;
 import org.talend.sdk.component.api.record.Record;
 
 import java.io.IOException;
@@ -11,5 +11,5 @@ import java.util.List;
 
 public interface QueryManager extends Serializable {
 
-    List<Reject> execute(List<Record> records, ExampleSQLComponentService.DataSource dataSource) throws SQLException, IOException;
+    void execute(List<Record> records, AvalancheComponentBulkService.DataSource dataSource) throws SQLException, IOException;
 }

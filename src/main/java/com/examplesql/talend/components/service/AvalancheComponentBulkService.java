@@ -4,6 +4,7 @@ import com.examplesql.talend.components.dataset.AvalancheTableDataset;
 import com.examplesql.talend.components.datastore.AvalancheDatastore;
 import com.examplesql.talend.components.output.Column;
 import com.examplesql.talend.components.output.Table;
+import com.google.gson.Gson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.talend.sdk.component.api.configuration.Option;
@@ -65,28 +66,28 @@ public class AvalancheComponentBulkService {
         }
     }
 
-    public void createTableIfNotExist(final Connection connection, final String name,
-//                                      final List<String> keys,
-                                      final int varcharLength, final List<Record> records) throws SQLException {
-        if (records.isEmpty()) {
-            return;
-        }
-
-        final String sql = buildQuery(getTableModel(connection, name,
-//                keys,
-                varcharLength, records));
-        try (final Statement statement = connection.createStatement()) {
-            statement.executeUpdate(sql);
-            connection.commit();
-        } catch (final Throwable e) {
-            connection.rollback();
-            if (!isTableExistsCreationError(e)) {
-                throw new IllegalStateException(e);
-            }
-
-            LOG.trace("create table issue was ignored. The table and it's name space has been created by an other worker", e);
-        }
-    }
+//    public void createTableIfNotExist(final Connection connection, final String name,
+////                                      final List<String> keys,
+//                                      final int varcharLength, final List<Record> records) throws SQLException {
+//        if (records.isEmpty()) {
+//            return;
+//        }
+//
+//        final String sql = buildQuery(getTableModel(connection, name,
+////                keys,
+//                varcharLength, records));
+//        try (final Statement statement = connection.createStatement()) {
+//            statement.executeUpdate(sql);
+//            connection.commit();
+//        } catch (final Throwable e) {
+//            connection.rollback();
+//            if (!isTableExistsCreationError(e)) {
+//                throw new IllegalStateException(e);
+//            }
+//
+//            LOG.trace("create table issue was ignored. The table and it's name space has been created by an other worker", e);
+//        }
+//    }
 
     protected String buildQuery(final Table table) {
         // keep the string builder for readability
@@ -158,10 +159,9 @@ public class AvalancheComponentBulkService {
                 return "INTEGER8";
             case INT:
                 return "INTEGER4";
-            case BYTES:
-                return "BLOB";
             case DATETIME:
-                return "TIIMESTAMP WITHOUT TIME ZONE";
+                return "TIMESTAMP";
+            case BYTES:
             case RECORD:
             case ARRAY:
             default:
@@ -287,6 +287,18 @@ public class AvalancheComponentBulkService {
         }
 
         return new SuggestionValues(false, Collections.emptyList());
+    }
+
+    @Suggestions("formatList")
+    public SuggestionValues getFormat(@Option final AvalancheTableDataset dataset) {
+        SuggestionValues suggestionValues = new SuggestionValues();
+        List<SuggestionValues.Item> items = new ArrayList<>();
+        items.add(new SuggestionValues.Item("CSV","CSV"));
+        items.add(new SuggestionValues.Item("PARQUET","PARQUET"));
+
+        suggestionValues.setItems(items);
+
+        return suggestionValues;
     }
 
     @Suggestions("actionsList")

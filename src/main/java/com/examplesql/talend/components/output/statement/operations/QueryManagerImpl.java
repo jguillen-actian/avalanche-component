@@ -7,19 +7,29 @@ import com.examplesql.talend.components.output.Table;
 import com.examplesql.talend.components.output.statement.QueryManager;
 import com.examplesql.talend.components.service.AvalancheComponentBulkService;
 import com.examplesql.talend.components.service.I18nMessage;
+import com.google.gson.Gson;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.talend.sdk.component.api.record.Record;
 import org.talend.sdk.component.api.record.Schema;
 
-import java.sql.*;
-import java.util.*;
+import java.sql.BatchUpdateException;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
-import static java.util.Collections.emptyList;
 import static java.util.Optional.*;
 import static java.util.stream.Collectors.joining;
 import static java.util.stream.Collectors.toList;
+import static org.talend.sdk.component.api.record.Schema.Type.DATETIME;
 import static org.talend.sdk.component.api.record.Schema.Type.STRING;
 
 public abstract class QueryManagerImpl implements QueryManager {
@@ -33,6 +43,8 @@ public abstract class QueryManagerImpl implements QueryManager {
     private final Integer maxRetry = 10;
 
     private Integer retryCount = 0;
+
+    private Boolean isExternalTableCreated = false;
 
     protected Boolean isCreateTable = false;
     protected Boolean isDropTable = false;
@@ -66,11 +78,25 @@ public abstract class QueryManagerImpl implements QueryManager {
 //                    configuration.getVarcharLength(), records));
             setConfigurations();
 
+            LOG.debug(new Gson().toJson(configuration));
+
+            String externalTableName = UUID.randomUUID().toString();
+            externalTableName = externalTableName.replaceAll("[-\\d]+", "");
             Table table =  getTableModel(connection,
                     configuration.getDataset().getTableName(),
-                    configuration.getKeys(),
+//                    configuration.getKeys(),
                     configuration.getVarcharLength(),
                     records);
+            Table externalTable = getTableModel(connection,
+                    externalTableName,
+//                    configuration.getKeys(),
+                    configuration.getVarcharLength(),
+                    records);
+
+            //Load data to External Table
+            executeUpdate(connection, createExternalTableQuery(externalTable));
+            isCreateNotExists = true;
+
             if(isDropTable){
                 executeUpdate(connection, dropTableQuery(table));
             }
@@ -78,7 +104,12 @@ public abstract class QueryManagerImpl implements QueryManager {
                 executeUpdate(connection,
                    createTableQuery(table));
             }
-//        }
+
+            //Load data to Table from External Table
+            executeUpdate(connection, insertIntoQuery(table, externalTable));
+
+            executeUpdate(connection, dropTableQuery(externalTable));
+            isExternalTableCreated = true;
 
         }
 
@@ -96,6 +127,74 @@ public abstract class QueryManagerImpl implements QueryManager {
 
             LOG.trace("create table issue was ignored. The table and it's name space has been created by an other worker", e);
         }
+    }
+
+
+    private String createExternalTableQuery(Table table){
+        OutputConfiguration.Format fileFormat = configuration.getFormat();
+        final StringBuilder sql = new StringBuilder("CREATE EXTERNAL TABLE");
+        sql.append(" ");
+        if (table.getSchema() != null && !table.getSchema().isEmpty()) {
+            sql.append(table.getSchema()).append(".");
+        }
+        sql.append(table.getName());
+        sql.append("(");
+        sql.append(createExternalColumns(table.getColumns()));
+        sql.append(createPKs(table.getName(),
+                table.getColumns().stream().filter(Column::isPrimaryKey).collect(Collectors.toList())));
+        sql.append(")");
+        sql.append(" ");
+        sql.append("USING SPARK");
+        sql.append(" ");
+        sql.append("WITH REFERENCE=");
+        sql.append(identifier(awsS3Path(configuration.getS3Bucket(), configuration.getFilename())));
+        sql.append(",");
+        sql.append(" ");
+        sql.append("FORMAT=");
+        sql.append(identifier(fileFormat.label));
+        switch (fileFormat)  {
+            case CSV: {
+                sql.append(",");
+                sql.append(" ");
+                sql.append("OPTIONS=(");
+                sql.append(addOption("header", String.valueOf(configuration.getHeader())).substring(1));
+                sql.append(addOption("sep", configuration.getFieldDelimiter()));
+                sql.append(addOption("schema", createSchemaColumns(table.getColumns())));
+                if (configuration.getDateFormat() != null && configuration.getDateFormat() != "") {
+                    sql.append((addOption("dateFormat", configuration.getDateFormat())));
+                }
+                if (configuration.getTimestampFormat() != null && configuration.getTimestampFormat() != "") {
+                    sql.append((addOption("timestampFormat", configuration.getTimestampFormat())));
+                }
+                //Add extra delimiter options.
+                sql.append(delimiterOptions(configuration.getSettings()));
+                sql.append(")");
+            }
+
+        }
+
+        LOG.debug("### create external table query ###");
+        LOG.debug(sql.toString());
+        return sql.toString();
+    }
+
+    private String insertIntoQuery(Table table, Table externalTable){
+        final StringBuilder sql = new StringBuilder("INSERT INTO");
+        sql.append(" ");
+        if (table.getSchema() != null && !table.getSchema().isEmpty()) {
+            sql.append(table.getSchema()).append(".");
+        }
+        sql.append(table.getName());
+        sql.append(" ");
+        sql.append("SELECT * FROM ");
+        if (externalTable.getSchema() != null && !externalTable.getSchema().isEmpty()) {
+            sql.append(externalTable.getSchema()).append(".");
+        }
+        sql.append(externalTable.getName());
+
+        LOG.debug("### insert from external table query ###");
+        LOG.debug(sql.toString());
+        return  sql.toString();
     }
 
     private String createTableQuery(Table table){
@@ -134,6 +233,8 @@ public abstract class QueryManagerImpl implements QueryManager {
         }
         sql.append(table.getName());
         LOG.debug(sql.toString());
+
+        LOG.debug("### drop table query ###");
         return sql.toString();
     }
 
@@ -269,7 +370,7 @@ public abstract class QueryManagerImpl implements QueryManager {
     }
 
     protected Table getTableModel(final Connection connection, final String name,
-                                  final List<String> keys,
+//                                  final List<String> keys,
                                   final int varcharLength, final List<Record> records) {
         final Table.TableBuilder builder = Table.builder().name(name);
         try {
@@ -289,11 +390,30 @@ public abstract class QueryManagerImpl implements QueryManager {
     protected String createColumns(final List<Column> columns) {
         return columns.stream().map(this::createColumn).collect(joining(","));
     }
+    protected String createExternalColumns(final List<Column> columns) {
+        return columns.stream().map(this::createExternalColumn).collect(joining(","));
+    }
+    protected String createSchemaColumns(final List<Column> columns) {
+        return columns.stream().map(this::createSchemaColumn).collect(joining(","));
+    }
 
     private String createColumn(final Column column) {
         return column.getEntry().getName()//
                 + " " + toDBType(column)//
                 + " " + isRequired(column)//
+                ;
+    }
+
+    private String createExternalColumn(final Column column) {
+        return column.getEntry().getName()//
+                + " " + toDBExternalType(column)
+                + " " + isRequired(column)//
+                ;
+    }
+
+    private String createSchemaColumn(final Column column) {
+        return column.getEntry().getName()//
+                + " " + (column.getEntry().getType() == DATETIME ? STRING: column.getEntry().getType()) //
                 ;
     }
 
@@ -313,19 +433,44 @@ public abstract class QueryManagerImpl implements QueryManager {
             case FLOAT:
                 return "FLOAT";
             case LONG:
-                return "INTEGER8";
+                return "BIGINT";
             case INT:
-                return "INTEGER4";
-            case BYTES:
-                return "BLOB";
+                return "INTEGER";
             case DATETIME:
-                return "TIIMESTAMP WITHOUT TIME ZONE";
+                return "TIMESTAMP";
+            case BYTES:
             case RECORD:
             case ARRAY:
             default:
                 throw new IllegalStateException(this.i18n.errorUnsupportedType(column.getEntry().getType().name(), column.getEntry().getName()));
         }
     }
+
+    private String toDBExternalType(final Column column) {
+        switch (column.getEntry().getType()) {
+            case STRING:
+                return column.getSize() <= -1 ?  "VARCHAR(255)"
+                        : "VARCHAR(" + column.getSize() + ")";
+            case BOOLEAN:
+                return "BOOLEAN";
+            case DOUBLE:
+                return "DECIMAL";
+            case FLOAT:
+                return "FLOAT";
+            case LONG:
+                return "BIGINT";
+            case INT:
+                return "INTEGER";
+            case DATETIME:
+                return "VARCHAR(20)";
+            case BYTES:
+            case RECORD:
+            case ARRAY:
+            default:
+                throw new IllegalStateException(this.i18n.errorUnsupportedType(column.getEntry().getType().name(), column.getEntry().getName()));
+        }
+    }
+
 
     protected boolean isTableExistsCreationError(Throwable e) {
         return false;
@@ -341,5 +486,43 @@ public abstract class QueryManagerImpl implements QueryManager {
         final String uuid = UUID.randomUUID().toString();
         return "pk_" + table + "_" + primaryKeys.stream().map(Column::getName).collect(joining("_")) + "_"
                 + uuid.substring(0, Math.min(4, uuid.length()));
+    }
+
+    public String awsS3Path(String bucket, String filename){
+        final StringBuilder s3 = new StringBuilder("s3a://");
+        s3.append(bucket);
+        s3.append("/");
+        s3.append(filename);
+
+        return s3.toString();
+    }
+
+    public String identifier(final String name) {
+        return name == null || name.isEmpty() ? name : delimiterToken() + name + delimiterToken();
+    }
+
+    protected String delimiterToken() {
+        return "'";
+    }
+
+    protected String addOption(final  String key, final String value){
+        StringBuilder sb = new StringBuilder(",");
+        sb.append(" ");
+        sb.append(identifier(key));
+        sb.append("=");
+        sb.append(identifier(value));
+        return sb.toString();
+    }
+
+    protected String delimiterOptions(List<OutputConfiguration.Settings> settings){
+        if(settings.size() > 0){
+            StringBuilder sb = new StringBuilder();
+            for (OutputConfiguration.Settings setting : settings){
+                sb.append(addOption(setting.getParameter().label, setting.getValue()));
+            }
+            return sb.toString();
+        }
+        return "";
+
     }
 }

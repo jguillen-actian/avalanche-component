@@ -1,10 +1,5 @@
 package com.examplesql.talend.components.source;//package com.examplesql.talend.components.source;
 //
-//import static java.util.Collections.singletonList;
-//
-//import java.io.Serializable;
-//import java.util.List;
-//
 //import com.examplesql.talend.components.service.AvalancheComponentBulkService;
 //import com.examplesql.talend.components.service.I18nMessage;
 //import org.talend.sdk.component.api.component.Icon;
@@ -16,31 +11,30 @@ package com.examplesql.talend.components.source;//package com.examplesql.talend.
 //import org.talend.sdk.component.api.input.PartitionSize;
 //import org.talend.sdk.component.api.input.Split;
 //import org.talend.sdk.component.api.meta.Documentation;
-//import org.talend.sdk.component.api.service.record.RecordBuilderFactory;
 //
-////
-//// this class role is to enable the work to be distributed in environments supporting it.
-////
-//@Version(1) // default version is 1, if some configuration changes happen between 2 versions you can add a migrationHandler
-//@Icon(value = Icon.IconType.CUSTOM, custom = "Avalanche") // you can use a custom one using @Icon(value=CUSTOM, custom="filename") and adding icons/filename.svg in resources
-//@PartitionMapper(name = "AvalancheTableNameInput")
+//import java.io.Serializable;
+//import java.util.List;
+//
+//import static java.util.Collections.singletonList;
+//
+//@Version(1)
+//// default version is 1, if some configuration changes happen between 2 versions you can add a migrationHandler
+//@Icon(value = Icon.IconType.CUSTOM, custom = "Avalanche")
+//// you can use a custom one using @Icon(value=CUSTOM, custom="filename") and adding icons/filename.svg in resources
+//@PartitionMapper(name = "CloudStorage")
 //@Documentation("TODO fill the documentation for this mapper")
-//public class TableNameInputMapper implements Serializable {
-//    private final TableNameInputMapperConfiguration configuration;
+//public class CloudStorageInputMapper implements Serializable {
+//    private final CloudStorageInputMapperConfiguration configuration;
 //    private final AvalancheComponentBulkService service;
-//    private final RecordBuilderFactory recordBuilderFactory;
 //    private final I18nMessage i18nMessage;
 //
-//    public TableNameInputMapper(@Option("configuration") final TableNameInputMapperConfiguration configuration,
-//                        final AvalancheComponentBulkService service,
-//                        final RecordBuilderFactory recordBuilderFactory,
-//                                final I18nMessage i18nMessage) {
+//    public CloudStorageInputMapper(@Option("configuration") final CloudStorageInputMapperConfiguration configuration,
+//                                   final AvalancheComponentBulkService service,
+//                                   final I18nMessage i18nMessage) {
 //        this.configuration = configuration;
 //        this.service = service;
-//        this.recordBuilderFactory = recordBuilderFactory;
 //        this.i18nMessage = i18nMessage;
 //    }
-//
 //    @Assessor
 //    public long estimateSize() {
 //        // this method should return the estimation of the dataset size
@@ -50,7 +44,7 @@ package com.examplesql.talend.components.source;//package com.examplesql.talend.
 //    }
 //
 //    @Split
-//    public List<TableNameInputMapper> split(@PartitionSize final long bundles) {
+//    public List<CloudStorageInputMapper> split(@PartitionSize final long bundles) {
 //        // overall idea here is to split the work related to configuration in bundles of size "bundles"
 //        //
 //        // for instance if your estimateSize() returned 1000 and you can run on 10 nodes
@@ -62,10 +56,10 @@ package com.examplesql.talend.components.source;//package com.examplesql.talend.
 //    }
 //
 //    @Emitter
-//    public TableNameInputSource createWorker() {
+//    public CloudStorageInputSource createWorker() {
 //        // here we create an actual worker,
 //        // you are free to rework the configuration etc but our default generated implementation
 //        // propagates the partition mapper entries.
-//        return new TableNameInputSource(configuration, service, recordBuilderFactory,i18nMessage);
+//        return new CloudStorageInputSource(configuration, service, i18nMessage);
 //    }
 //}

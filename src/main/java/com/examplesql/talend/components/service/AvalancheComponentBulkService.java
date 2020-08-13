@@ -2,14 +2,13 @@ package com.examplesql.talend.components.service;
 
 import com.examplesql.talend.components.dataset.AvalancheTableDataset;
 import com.examplesql.talend.components.datastore.AvalancheDatastore;
-import com.examplesql.talend.components.output.Column;
-import com.examplesql.talend.components.output.Table;
-import com.google.gson.Gson;
+import com.examplesql.talend.components.source.AvalancheBulkMapperConfiguration;
+import com.examplesql.talend.components.output.AvalancheSchema;
+import com.examplesql.talend.components.output.Field;
+import com.examplesql.talend.components.output.SQLDataTypes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.talend.sdk.component.api.configuration.Option;
-import org.talend.sdk.component.api.record.Record;
-import org.talend.sdk.component.api.record.Schema;
 import org.talend.sdk.component.api.service.Service;
 import org.talend.sdk.component.api.service.completion.SuggestionValues;
 import org.talend.sdk.component.api.service.completion.Suggestions;
@@ -18,10 +17,13 @@ import org.talend.sdk.component.api.service.healthcheck.HealthCheckStatus;
 
 import java.sql.Connection;
 import java.sql.DatabaseMetaData;
+import java.sql.Driver;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.sql.Types;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -32,10 +34,8 @@ import java.util.Set;
 import java.util.stream.Collectors;
 import java.util.stream.IntStream;
 
+import static java.sql.ResultSetMetaData.columnNoNulls;
 import static java.util.Optional.ofNullable;
-import static java.util.stream.Collectors.joining;
-import static java.util.stream.Collectors.toList;
-import static org.talend.sdk.component.api.record.Schema.Type.STRING;
 
 @Service
 public class AvalancheComponentBulkService {
@@ -44,6 +44,7 @@ public class AvalancheComponentBulkService {
 
     @Service
     private I18nMessage i18n;
+
 
     public static boolean checkTableExistence(final String tableName, final DataSource dataSource)
             throws SQLException {
@@ -66,122 +67,6 @@ public class AvalancheComponentBulkService {
         }
     }
 
-//    public void createTableIfNotExist(final Connection connection, final String name,
-////                                      final List<String> keys,
-//                                      final int varcharLength, final List<Record> records) throws SQLException {
-//        if (records.isEmpty()) {
-//            return;
-//        }
-//
-//        final String sql = buildQuery(getTableModel(connection, name,
-////                keys,
-//                varcharLength, records));
-//        try (final Statement statement = connection.createStatement()) {
-//            statement.executeUpdate(sql);
-//            connection.commit();
-//        } catch (final Throwable e) {
-//            connection.rollback();
-//            if (!isTableExistsCreationError(e)) {
-//                throw new IllegalStateException(e);
-//            }
-//
-//            LOG.trace("create table issue was ignored. The table and it's name space has been created by an other worker", e);
-//        }
-//    }
-
-    protected String buildQuery(final Table table) {
-        // keep the string builder for readability
-        final StringBuilder sql = new StringBuilder("CREATE TABLE");
-        sql.append(" ");
-        sql.append("IF NOT EXISTS");
-        sql.append(" ");
-        if (table.getSchema() != null && !table.getSchema().isEmpty()) {
-            sql.append(identifier(table.getSchema())).append(".");
-        }
-        sql.append(identifier(table.getName()));
-        sql.append("(");
-        sql.append(createColumns(table.getColumns()));
-//        sql.append(createPKs(table.getName(),
-//                table.getColumns().stream().filter(Column::isPrimaryKey).collect(Collectors.toList())));
-        sql.append(")");
-        // todo create index
-
-        LOG.debug("### create table query ###");
-        LOG.debug(sql.toString());
-        return sql.toString();
-    }
-
-    protected Table getTableModel(final Connection connection, final String name,
-//                                  final List<String> keys,
-                                  final int varcharLength, final List<Record> records) {
-        final Table.TableBuilder builder = Table.builder().name(name);
-        try {
-            builder.catalog(connection.getCatalog()).schema(connection.getSchema());
-        } catch (final SQLException e) {
-            LOG.warn("can't get database catalog or schema", e);
-        }
-        final List<Schema.Entry> entries = records.stream().flatMap(record -> record.getSchema().getEntries().stream()).distinct()
-                .collect(toList());
-        return builder.columns(entries.stream()
-                .map(entry -> Column.builder().entry(entry)
-//                        .primaryKey(keys.contains(entry.getName()))
-                        .size(STRING == entry.getType() ? varcharLength : null).build())
-                .collect(toList())).build();
-    }
-
-    public String identifier(final String name) {
-        return name == null || name.isEmpty() ? name : delimiterToken() + name + delimiterToken();
-    }
-
-    private String createColumns(final List<Column> columns) {
-        return columns.stream().map(this::createColumn).collect(joining(","));
-    }
-
-    private String createColumn(final Column column) {
-        return identifier(column.getEntry().getName())//
-                + " " + toDBType(column)//
-                + " " + isRequired(column)//
-                ;
-    }
-
-    private String toDBType(final Column column) {
-        switch (column.getEntry().getType()) {
-            case STRING:
-                return column.getSize() <= -1 ?  "VARCHAR(255)"
-                        : "VARCHAR(" + column.getSize() + ")";
-            case BOOLEAN:
-                return "BOOLEAN";
-            case DOUBLE:
-                return "DECIMAL";
-            case FLOAT:
-                return "FLOAT";
-            case LONG:
-                return "INTEGER8";
-            case INT:
-                return "INTEGER4";
-            case DATETIME:
-                return "TIMESTAMP";
-            case BYTES:
-            case RECORD:
-            case ARRAY:
-            default:
-                throw new IllegalStateException(this.i18n.errorUnsupportedType(column.getEntry().getType().name(), column.getEntry().getName()));
-        }
-    }
-
-    private String isRequired(final Column column) {
-        return column.getEntry().isNullable() && !column.isPrimaryKey() ? "NULL" : "NOT NULL";
-    }
-
-//    private String createPKs(final String table, final List<Column> primaryKeys) {
-//        return primaryKeys == null || primaryKeys.isEmpty() ? ""
-//                : ", CONSTRAINT " + pkConstraintName(table, primaryKeys) + " PRIMARY KEY "
-//                + primaryKeys.stream().map(Column::getName).map(this::identifier).collect(joining(",", "(", ")"));
-//    }
-
-    protected String delimiterToken() {
-        return "`";
-    }
 
     @HealthCheck("validateConnection")
     public HealthCheckStatus validateConnection(@Option final AvalancheDatastore datastore)
@@ -222,13 +107,20 @@ public class AvalancheComponentBulkService {
 
         private void createConnection()
         {
+            LOG.debug("Before finding class name.");
             try {
+//                Driver driver = new com.ingres.jdbc.IngresDriver();
+//                DriverManager.registerDriver(driver);
+//                getClass().getClassLoader().loadClass("com.ingres.jdbc.IngresDriver").newInstance();
                 Class.forName( "com.ingres.jdbc.IngresDriver" ).newInstance();
+                LOG.debug("After finding class name.");
                 connection = DriverManager.getConnection("jdbc:ingres://"+ datastore.getHost() +":"+ datastore.getPort() + "/"+ datastore.getDatabase() + ";",
                         datastore.getUsername(), datastore.getPassword());
+                LOG.debug("After connection.");
                 connection.setAutoCommit(isAutoCommit);
 
-            } catch ( InstantiationException | IllegalAccessException |
+            } catch (
+                    InstantiationException | IllegalAccessException |
                     ClassNotFoundException|
                 SQLException e) {
                 LOG.error(e.getMessage());
@@ -256,11 +148,6 @@ public class AvalancheComponentBulkService {
         }
     }
 
-    protected boolean isTableExistsCreationError(Throwable e) {
-        return false;
-    }
-
-
     @Suggestions("suggestTableColumnNames")
     public SuggestionValues getTableColumns(@Option final AvalancheTableDataset dataset) {
 
@@ -287,18 +174,6 @@ public class AvalancheComponentBulkService {
         }
 
         return new SuggestionValues(false, Collections.emptyList());
-    }
-
-    @Suggestions("formatList")
-    public SuggestionValues getFormat(@Option final AvalancheTableDataset dataset) {
-        SuggestionValues suggestionValues = new SuggestionValues();
-        List<SuggestionValues.Item> items = new ArrayList<>();
-        items.add(new SuggestionValues.Item("CSV","CSV"));
-        items.add(new SuggestionValues.Item("PARQUET","PARQUET"));
-
-        suggestionValues.setItems(items);
-
-        return suggestionValues;
     }
 
     @Suggestions("actionsList")
@@ -360,4 +235,102 @@ public class AvalancheComponentBulkService {
 
         return tableTypes;
     }
+
+    public Field convert(AvalancheBulkMapperConfiguration.Column column){
+       Integer length;
+        try {
+            length = Integer.valueOf(column.getLength());
+        }catch (NumberFormatException e){
+           length = -1;
+        }
+
+        return Field.builder()
+                .columnName(column.getColumnName())
+                .type(column.getType())
+                .length(length)
+                .nullable(column.getNullable())
+                .build();
+    }
+
+    public AvalancheSchema convert(List<AvalancheBulkMapperConfiguration.Column> columns){
+
+        List<Field> fields = new ArrayList<>();
+        for(AvalancheBulkMapperConfiguration.Column column : columns){
+            fields.add(convert(column));
+        }
+        return  AvalancheSchema.builder().fields(fields).build();
+    }
+
+    public AvalancheBulkMapperConfiguration.Column fieldToColumn (Field field){
+        AvalancheBulkMapperConfiguration.Column column = new AvalancheBulkMapperConfiguration.Column();
+        column.setColumnName(field.getColumnName());
+        column.setType(field.getType());
+        column.setNullable(field.getNullable());
+        column.setLength(String.valueOf(field.getLength()));
+        return  column;
+    }
+
+    public List<AvalancheBulkMapperConfiguration.Column> schemaToColumns(AvalancheSchema schema){
+        List<AvalancheBulkMapperConfiguration.Column> columns = new ArrayList<>();
+        for(Field field : schema.getFields()){
+            columns.add(fieldToColumn(field));
+        }
+        return columns;
+    }
+
+    public void addField(final List<Field> fields, final ResultSetMetaData metaData, final  int columnIndex){
+        try {
+            final String javaType = metaData.getColumnClassName(columnIndex);
+            final int sqlType = metaData.getColumnType(columnIndex);
+            final Field.FieldBuilder fieldBuilder = Field.builder().columnName(metaData.getColumnName(columnIndex))
+                    .nullable(metaData.isNullable(columnIndex) != columnNoNulls);
+            switch (sqlType) {
+                case Types.SMALLINT:
+                    fields.add(fieldBuilder.type(SQLDataTypes.SMALLINT).build());
+                    break;
+                case Types.TINYINT:
+                    fields.add(fieldBuilder.type(SQLDataTypes.TINYINT).build());
+                    break;
+                case Types.INTEGER:
+                    fields.add(fieldBuilder.type(SQLDataTypes.INTEGER).build());
+                    break;
+                case Types.DOUBLE:
+                case Types.FLOAT:
+                case Types.DECIMAL:
+                case Types.NUMERIC:
+                    fields.add(fieldBuilder.type(SQLDataTypes.FLOAT).build());
+                    break;
+                case Types.BOOLEAN:
+                    fields.add(fieldBuilder.type(SQLDataTypes.BOOLEAN).build());
+                    break;
+                case Types.TIME:
+                    fields.add(fieldBuilder.type(SQLDataTypes.TIME).build());
+                    break;
+                case Types.DATE:
+                    fields.add(fieldBuilder.type(SQLDataTypes.ANSIDATE).build());
+                    break;
+                case Types.TIMESTAMP:
+                    fields.add(fieldBuilder.type(SQLDataTypes.TIMESTAMP).build());
+                    break;
+                case Types.BIGINT:
+                    fields.add(fieldBuilder.type(SQLDataTypes.BIGINT).build());
+                    break;
+                case Types.CHAR:
+                    fields.add(fieldBuilder.type(SQLDataTypes.CHAR).build());
+                    break;
+                case Types.BINARY:
+                case Types.VARBINARY:
+                case Types.LONGVARBINARY:
+                case Types.VARCHAR:
+                case Types.LONGVARCHAR:
+                default:
+                    fields.add(fieldBuilder.type(SQLDataTypes.VARCHAR).length(metaData.getColumnDisplaySize(columnIndex)).build());
+                    break;
+            }
+        } catch (final SQLException e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+
 }

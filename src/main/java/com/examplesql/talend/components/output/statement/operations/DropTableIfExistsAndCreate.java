@@ -1,6 +1,6 @@
 package com.examplesql.talend.components.output.statement.operations;
 
-import com.examplesql.talend.components.output.OutputConfiguration;
+import com.examplesql.talend.components.source.AvalancheBulkMapperConfiguration;
 import com.examplesql.talend.components.service.I18nMessage;
 import org.talend.sdk.component.api.record.Schema;
 
@@ -13,7 +13,7 @@ public class DropTableIfExistsAndCreate extends QueryManagerImpl {
 
     private final Map<String, String> queries = new HashMap<>();
 
-    public DropTableIfExistsAndCreate(final OutputConfiguration configuration, final I18nMessage i18n) {
+    public DropTableIfExistsAndCreate(final AvalancheBulkMapperConfiguration configuration, final I18nMessage i18n) {
         super(i18n, configuration);
         namedParams = new HashMap<>();
     }

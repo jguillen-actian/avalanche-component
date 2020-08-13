@@ -1,6 +1,7 @@
 package com.examplesql.talend.components.service;//package com.examplesql.talend.components.service;
 //
 //import com.examplesql.talend.components.dataset.TableNameDataset;
+//import com.examplesql.talend.components.datastore.AvalancheDatastore;
 //import com.examplesql.talend.components.datastore.ExampleSQLDatastore;
 //import com.examplesql.talend.components.output.Column;
 //import com.examplesql.talend.components.output.Table;
@@ -127,28 +128,7 @@ package com.examplesql.talend.components.service;//package com.examplesql.talend
 //
 //
 //
-//    @Suggestions("listTables")
-//    public SuggestionValues getTableFromDatabase(@Option final ExampleSQLDatastore datastore) {
-//        final Collection<SuggestionValues.Item> items = new HashSet<>();
-//        try (Connection connection = createExampleDataSource(datastore).getConnection()) {
-//            final DatabaseMetaData dbMetaData = connection.getMetaData();
-//            try (ResultSet tables = dbMetaData.getTables(connection.getCatalog(), connection.getSchema(), null,
-//                    getAvailableTableTypes(dbMetaData).toArray(new String[0]))) {
-//                while (tables.next()) {
-//                    ofNullable(ofNullable(tables.getString("TABLE_NAME")).orElseGet(() -> {
-//                        try {
-//                            return tables.getString("SYNONYM_NAME");
-//                        } catch (final SQLException e) {
-//                            return null;
-//                        }
-//                    })).ifPresent(t -> items.add(new SuggestionValues.Item(t, t)));
-//                }
-//            }
-//        } catch (final Exception unexpected) { // catch all exceptions for this ui label to return empty list
-//            LOG.error(i18n.errorCantLoadTableSuggestions(), unexpected);
-//        }
-//        return new SuggestionValues(true, items);
-//    }
+//
 //
 //    private Set<String> getSupportedTableTypes()
 //    {

@@ -9,6 +9,7 @@ package com.examplesql.talend.components.source;//package com.examplesql.talend.
 //import javax.annotation.PostConstruct;
 //import javax.annotation.PreDestroy;
 //
+//import com.examplesql.talend.components.service.AvalancheComponentBulkService;
 //import com.examplesql.talend.components.service.I18nMessage;
 //import org.slf4j.Logger;
 //import org.slf4j.LoggerFactory;
@@ -20,7 +21,6 @@ package com.examplesql.talend.components.source;//package com.examplesql.talend.
 //import org.talend.sdk.component.api.service.record.RecordBuilderFactory;
 //
 //
-//import com.examplesql.talend.components.service.ExampleSQLComponentService;
 //
 //import static java.sql.ResultSetMetaData.columnNoNulls;
 //import static org.talend.sdk.component.api.record.Schema.Type.*;
@@ -29,10 +29,10 @@ package com.examplesql.talend.components.source;//package com.examplesql.talend.
 //public class TableNameInputSource implements Serializable {
 //    private static final Pattern validTableName = Pattern.compile("[a-zA-Z0-9$_]{3,}");
 //    private final TableNameInputMapperConfiguration configuration;
-//    private final ExampleSQLComponentService service;
+//    private final AvalancheComponentBulkService service;
 //    private final RecordBuilderFactory builderFactory;
 //    private final I18nMessage i18n;
-//    private ExampleSQLComponentService.DataSource dataSource;
+//    private AvalancheComponentBulkService.DataSource dataSource;
 //    private Connection connection;
 //    private Statement statement;
 //    private ResultSet resultSet;
@@ -41,7 +41,7 @@ package com.examplesql.talend.components.source;//package com.examplesql.talend.
 //    private static final transient Logger LOG = LoggerFactory.getLogger(TableNameInputSource.class);
 //
 //    public TableNameInputSource(@Option("configuration") final TableNameInputMapperConfiguration configuration,
-//                        final ExampleSQLComponentService service,
+//                        final AvalancheComponentBulkService service,
 //                        final RecordBuilderFactory builderFactory,
 //                                final I18nMessage i18nMessage) {
 //        this.configuration = configuration;
@@ -56,9 +56,6 @@ package com.examplesql.talend.components.source;//package com.examplesql.talend.
 //        // this is where you can establish a connection for instance
 //        if (configuration.getDataset().getQuery() == null || configuration.getDataset().getQuery().trim().isEmpty()) {
 //            throw new IllegalArgumentException(i18n.errorEmptyQuery());
-//        }
-//        if (service.isNotReadOnlySQLQuery(configuration.getDataset().getQuery())) {
-//            throw new IllegalArgumentException(i18n.errorUnauthorizedQuery());
 //        }
 //
 //        try {
@@ -92,9 +89,7 @@ package com.examplesql.talend.components.source;//package com.examplesql.talend.
 //        // you can use the builderFactory to create a new Record.
 //        try {
 //            if (!resultSet.next() && !isGuessSchema) {
-//
 //                    return null;
-//
 //            }
 //
 //            final ResultSetMetaData metaData = resultSet.getMetaData();

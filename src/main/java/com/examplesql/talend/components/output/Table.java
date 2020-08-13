@@ -11,22 +11,16 @@ public class Table implements Serializable {
 
     private final String name;
 
-    private final List<Column> columns;
+    private final List<Field> columns;
 
-    private final List<Column> indexes;
-
-    public Table(String catalog, String schema, String name, List<Column> columns, List<Column> indexes)
+    public Table(String catalog, String schema, String name, List<Field> columns)
     {
         this.catalog = catalog;
         this.schema = schema;
         this.name = name;
         this.columns = columns;
-        this.indexes = indexes;
     }
 
-    public String getCatalog() {
-        return catalog;
-    }
 
     public String getSchema() {
         return schema;
@@ -36,12 +30,8 @@ public class Table implements Serializable {
         return name;
     }
 
-    public List<Column> getColumns() {
+    public List<Field> getColumns() {
         return columns;
-    }
-
-    public List<Column> getIndexes() {
-        return indexes;
     }
 
 
@@ -54,8 +44,7 @@ public class Table implements Serializable {
         private String catalog;
         private String schema;
         private String name;
-        private List<Column> columns;
-        private List<Column> indexes;
+        private List<Field> columns;
 
         public TableBuilder catalog(String catalog)
         {
@@ -75,20 +64,15 @@ public class Table implements Serializable {
             return this;
         }
 
-        public TableBuilder columns(List<Column> columns)
+        public TableBuilder columns(List<Field> columns)
         {
             this.columns = columns;
             return this;
         }
 
-        public TableBuilder indexes(List<Column> indexes)
-        {
-            this.indexes = indexes;
-            return this;
-        }
 
         public Table build() {
-            return new Table(catalog, schema, name, columns, indexes);
+            return new Table(catalog, schema, name, columns);
         }
     }
 }
